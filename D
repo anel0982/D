@@ -1,0 +1,697 @@
+local ScreenGui1 = Instance.new("ScreenGui")
+local ImageButton1 = Instance.new("ImageButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui1.Name = "ImageButton"
+ScreenGui1.Parent = game.CoreGui
+ScreenGui1.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ImageButton1.Parent = ScreenGui1
+ImageButton1.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+ImageButton1.BorderSizePixel = 0
+ImageButton1.Position = UDim2.new(0.120833337, 0, 0.0952890813, 0)
+ImageButton1.Size = UDim2.new(0, 50, 0, 50)
+ImageButton1.Draggable = true
+ImageButton1.Image = "rbxassetid://15814760626"
+ImageButton1.MouseButton1Down:connect(function()
+  game:GetService("VirtualInputManager"):SendKeyEvent(true,"LeftControl", false,game)
+  game:GetService("VirtualInputManager"):SendKeyEvent(false,"LeftControl", false,game)
+end)
+
+UICorner.Parent = ImageButton1
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Uriel Hub〘Community〙",
+    SubTitle = "by Gawr Uriel",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true, -- The blur may be detectable, setting this to false disables blur entirely
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl -- Used when theres no MinimizeKeybind
+})
+
+local PathfindingService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local Character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local tasks = {}
+local proximityprompts = {}
+local path = PathfindingService:CreatePath({AgentCanJump = false,AgentCanClimb = false,})
+local config = require(game:GetService("ReplicatedStorage").config)
+local HumanoidRootPart = Character.HumanoidRootPart
+
+-- taken from devforum
+local function GetPlayer(Input)
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if (string.lower(Input) == string.sub(string.lower(Player.Name), 1, #Input)) then
+            return Player;
+        end
+    end
+end
+
+local function getclosestprompt()
+    local Character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local prompt, distance = nil, 9e9
+
+    for i,v in pairs(proximityprompts) do
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            local distanceBetween = (Character.HumanoidRootPart.Position - i.Position).Magnitude
+
+            if distanceBetween < distance then
+                distance = distanceBetween
+                prompt = v
+            end
+        end
+    end
+
+    return prompt
+end
+
+local function fireproximityprompt(Obj, Amount, Skip)
+    if Obj.ClassName == "ProximityPrompt" then 
+        Amount = Amount or 1
+        local PromptTime = Obj.HoldDuration
+        if Skip then 
+            Obj.HoldDuration = 0
+        end
+        for i = 1, Amount do 
+            Obj:InputHoldBegin()
+            if not Skip then 
+                task.wait(Obj.HoldDuration + 1)
+            end
+            Obj:InputHoldEnd()
+        end
+        Obj.HoldDuration = PromptTime
+    else 
+        error("userdata<ProximityPrompt> expected")
+    end
+end
+
+local function killplayer(name)
+    if name == "all" then
+        for i,v in pairs(Players:GetChildren()) do
+            if v ~= Players.LocalPlayer then
+                game:GetService("ReplicatedStorage").Remotes.KillCharacter:InvokeServer(v.Character)
+            end
+        end
+    else
+        game:GetService("ReplicatedStorage").Remotes.KillCharacter:InvokeServer(GetPlayer(name).Character)
+    end
+end
+
+for i,v in pairs(game:GetService("ReplicatedStorage").Remotes.RequestTaskList:InvokeServer()) do
+    if v.TaskRequired then
+        tasks[v.TaskName] = v
+        print(v.TaskName .. " | " .. v.TaskDescriptor .. " | " .. v.TaskType)
+    end
+end
+
+for i,v in pairs(workspace.LoadedMap:GetDescendants()) do
+    if v:IsA("ProximityPrompt") then
+        proximityprompts[v.Parent.Parent] = v
+    end
+end
+
+
+local function doTasks()
+    for i,v in pairs(tasks) do
+        print(Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position)
+        path:ComputeAsync(Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart", 2).Position, v.CFrame.Position)
+
+        for i2, v2 in pairs(path:GetWaypoints()) do
+            Humanoid:MoveTo(v2.Position)
+            Humanoid.MoveToFinished:Wait()
+        end
+
+        -- the waits are to make it look more real
+        task.wait(0.1)
+        fireproximityprompt(getclosestprompt())
+        task.wait(math.random(0.5, 2))
+    end
+end
+
+local Noclip = nil
+local Clip = nil
+ 
+function noclip()
+ Clip = false
+ local function Nocl()
+  if Clip == false and game.Players.LocalPlayer.Character ~= nil then
+   for _,v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+    if v:IsA('BasePart') and v.CanCollide and v.Name ~= floatName then
+     v.CanCollide = false
+    end
+   end
+  end
+  wait(0.21) -- basic optimization
+ end
+ Noclip = game:GetService('RunService').Stepped:Connect(Nocl)
+end
+ 
+function clip()
+ if Noclip then Noclip:Disconnect() end
+ Clip = true
+end
+ 
+noclip() -- to toggle noclip() and clip()
+
+
+--Fluent provides Lucide Icons https://lucide.dev/icons/ for the tabs, icons are optional
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "main" }),
+    Esp = Window:AddTab({ Title = "Esp + Misc", Icon = "esp" }),
+Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+do
+    Fluent:Notify({
+        Title = "Thông báo",
+        Content = "map is Dingus",
+        SubContent = "Script by Gawr Uriel", -- Optional
+        Duration = 5 -- Set to nil to make the notification not disappear
+    })
+
+
+
+    Tabs.Main:AddParagraph({
+        Title = "Map Dingus",
+        Content = "Script has kill all player, no shoot cooldown, no blindness,......"
+    })
+
+
+
+    Tabs.Main:AddButton({
+        Title = "kill all",
+        Description = "kill all player",
+        Callback = function()
+            Window:Dialog({
+                Title = "Thông báo",
+                Content = "kill tất cả player",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+                            killplayer("all")
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancel")
+                        end
+                    }
+                }
+            })
+        end
+    })
+
+
+
+    local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "no shoot cooldown", Default = false })
+
+    Toggle:OnChanged(function(v)
+        if v then
+            config.HUNTER_FIRE_COOLDOWN_EXTRA = 0
+        else
+            config.HUNTER_FIRE_COOLDOWN_EXTRA = 1.25
+        end
+    end)
+
+    Options.MyToggle:SetValue(false)
+
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "no blindness", Default = false })
+
+    Toggle:OnChanged(function(v)
+          if v then
+            config.HUNTER_MISS_BLIND_TIME = 0
+        else
+            config.HUNTER_MISS_BLIND_TIME = 12
+        end
+    end)
+
+    Options.MyToggle:SetValue(false)
+    
+    Tabs.Main:AddButton({
+        Title = "legit auto task",
+        Description = "auto task",
+        Callback = function()
+            Window:Dialog({
+                Title = "Thông báo",
+                Content = "(really buggy for some reason)",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+                            doTasks()
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancel")
+                        end
+                    }
+                }
+            })
+        end
+    })
+    
+    Tabs.Main:AddButton({
+        Title = "do all tasks",
+        Description = "auto all tasks",
+        Callback = function()
+            Window:Dialog({
+                Title = "Thông báo",
+                Content = "All tasks",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+                            for i=1,20 do
+            print(game:GetService("ReplicatedStorage").Remotes.InvokeTaskCompleted:InvokeServer(i))
+        end
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancel")
+                        end
+                    }
+                }
+            })
+        end
+    })
+    
+    
+    
+    local Slider = Tabs.Main:AddSlider("WalkSpeed", {
+        Title = "Speed",
+        Description = "Super speed",
+        Default = 50,
+        Min = 0,
+        Max = 300,
+        Rounding = 1,
+        Callback = function(Value)
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    })
+
+    Slider:OnChanged(function(Value)
+        print("Slider changed:", Value)
+    end)
+
+    Slider:SetValue(3)
+    
+    Tabs.Esp:AddButton({
+        Title = "Esp player",
+        Description = "Esp Player",
+        Callback = function()
+            Window:Dialog({
+                Title = "Thông báo",
+                Content = "biết mọi người đang ở đâu",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+                            _G.FriendColor = Color3.fromRGB(0, 0, 255)
+_G.EnemyColor = Color3.fromRGB(255, 0, 0)
+_G.UseTeamColor = true
+
+--------------------------------------------------------------------
+local Holder = Instance.new("Folder", game.CoreGui)
+Holder.Name = "ESP"
+
+local Box = Instance.new("BoxHandleAdornment")
+Box.Name = "nilBox"
+Box.Size = Vector3.new(1, 2, 1)
+Box.Color3 = Color3.new(100 / 255, 100 / 255, 100 / 255)
+Box.Transparency = 0.7
+Box.ZIndex = 0
+Box.AlwaysOnTop = false
+Box.Visible = false
+
+local NameTag = Instance.new("BillboardGui")
+NameTag.Name = "nilNameTag"
+NameTag.Enabled = false
+NameTag.Size = UDim2.new(0, 200, 0, 50)
+NameTag.AlwaysOnTop = true
+NameTag.StudsOffset = Vector3.new(0, 1.8, 0)
+local Tag = Instance.new("TextLabel", NameTag)
+Tag.Name = "Tag"
+Tag.BackgroundTransparency = 1
+Tag.Position = UDim2.new(0, -50, 0, 0)
+Tag.Size = UDim2.new(0, 300, 0, 20)
+Tag.TextSize = 15
+Tag.TextColor3 = Color3.new(100 / 255, 100 / 255, 100 / 255)
+Tag.TextStrokeColor3 = Color3.new(0 / 255, 0 / 255, 0 / 255)
+Tag.TextStrokeTransparency = 0.4
+Tag.Text = "nil"
+Tag.Font = Enum.Font.SourceSansBold
+Tag.TextScaled = false
+
+local LoadCharacter = function(v)
+	repeat wait() until v.Character ~= nil
+	v.Character:WaitForChild("Humanoid")
+	local vHolder = Holder:FindFirstChild(v.Name)
+	vHolder:ClearAllChildren()
+	local b = Box:Clone()
+	b.Name = v.Name .. "Box"
+	b.Adornee = v.Character
+	b.Parent = vHolder
+	local t = NameTag:Clone()
+	t.Name = v.Name .. "NameTag"
+	t.Enabled = true
+	t.Parent = vHolder
+	t.Adornee = v.Character:WaitForChild("Head", 5)
+	if not t.Adornee then
+		return UnloadCharacter(v)
+	end
+	t.Tag.Text = v.Name
+	b.Color3 = Color3.new(v.TeamColor.r, v.TeamColor.g, v.TeamColor.b)
+	t.Tag.TextColor3 = Color3.new(v.TeamColor.r, v.TeamColor.g, v.TeamColor.b)
+	local Update
+	local UpdateNameTag = function()
+		if not pcall(function()
+			v.Character.Humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+			local maxh = math.floor(v.Character.Humanoid.MaxHealth)
+			local h = math.floor(v.Character.Humanoid.Health)
+		end) then
+			Update:Disconnect()
+		end
+	end
+	UpdateNameTag()
+	Update = v.Character.Humanoid.Changed:Connect(UpdateNameTag)
+end
+
+local UnloadCharacter = function(v)
+	local vHolder = Holder:FindFirstChild(v.Name)
+	if vHolder and (vHolder:FindFirstChild(v.Name .. "Box") ~= nil or vHolder:FindFirstChild(v.Name .. "NameTag") ~= nil) then
+		vHolder:ClearAllChildren()
+	end
+end
+
+local LoadPlayer = function(v)
+	local vHolder = Instance.new("Folder", Holder)
+	vHolder.Name = v.Name
+	v.CharacterAdded:Connect(function()
+		pcall(LoadCharacter, v)
+	end)
+	v.CharacterRemoving:Connect(function()
+		pcall(UnloadCharacter, v)
+	end)
+	v.Changed:Connect(function(prop)
+		if prop == "TeamColor" then
+			UnloadCharacter(v)
+			wait()
+			LoadCharacter(v)
+		end
+	end)
+	LoadCharacter(v)
+end
+
+local UnloadPlayer = function(v)
+	UnloadCharacter(v)
+	local vHolder = Holder:FindFirstChild(v.Name)
+	if vHolder then
+		vHolder:Destroy()
+	end
+end
+
+for i,v in pairs(game:GetService("Players"):GetPlayers()) do
+	spawn(function() pcall(LoadPlayer, v) end)
+end
+
+game:GetService("Players").PlayerAdded:Connect(function(v)
+	pcall(LoadPlayer, v)
+end)
+
+game:GetService("Players").PlayerRemoving:Connect(function(v)
+	pcall(UnloadPlayer, v)
+end)
+
+game:GetService("Players").LocalPlayer.NameDisplayDistance = 0
+
+if _G.Reantheajfdfjdgs then
+    return
+end
+
+_G.Reantheajfdfjdgs = ":suifayhgvsdghfsfkajewfrhk321rk213kjrgkhj432rj34f67df"
+
+local players = game:GetService("Players")
+local plr = players.LocalPlayer
+
+function esp(target, color)
+    if target.Character then
+        if not target.Character:FindFirstChild("GetReal") then
+            local highlight = Instance.new("Highlight")
+            highlight.RobloxLocked = true
+            highlight.Name = "GetReal"
+            highlight.Adornee = target.Character
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.FillColor = color
+            highlight.Parent = target.Character
+        else
+            target.Character.GetReal.FillColor = color
+        end
+    end
+end
+
+while task.wait() do
+    for i, v in pairs(players:GetPlayers()) do
+        if v ~= plr then
+            esp(v, _G.UseTeamColor and v.TeamColor.Color or ((plr.TeamColor == v.TeamColor) and _G.FriendColor or _G.EnemyColor))
+        end
+    end
+end
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancel")
+                        end
+                    }
+                }
+            })
+        end
+    })
+    
+    Tabs.Esp:AddButton({
+        Title = "invisible",
+        Description = "invisible",
+        Callback = function()
+            Window:Dialog({
+                Title = "Thông báo",
+                Content = "không ai có thể thấy bạn",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+
+character = game:GetService("Players").LocalPlayer.Character
+
+character.Head.Transparency = 1
+
+--R6 Rigs
+torso = character:FindFirstChild("Torso")
+if torso then torso.Transparency = 1 end
+
+leftArm = character:FindFirstChild("Left Arm")
+if leftArm then leftArm.Transparency = 1 end
+rightArm = character:FindFirstChild("Right Arm")
+if rightArm then rightArm.Transparency = 1 end
+
+leftLeg = character:FindFirstChild("Left Leg")
+if leftLeg then leftLeg.Transparency = 1 end
+rightLeg = character:FindFirstChild("Right Leg")
+if rightLeg then rightLeg.Transparency = 1 end
+
+--R15 Rigs
+upperTorso = character:FindFirstChild("UpperTorso")
+if upperTorso then upperTorso.Transparency = 1 end
+lowerTorso = character:FindFirstChild("LowerTorso")
+if lowerTorso then lowerTorso.Transparency = 1 end
+
+leftUpperArm = character:FindFirstChild("LeftUpperArm")
+if leftUpperArm then leftUpperArm.Transparency = 1 end
+leftLowerArm = character:FindFirstChild("LeftLowerArm")
+if leftLowerArm then leftLowerArm.Transparency = 1 end
+leftFoot = character:FindFirstChild("LeftFoot")
+if leftFoot then leftFoot.Transparency = 1 end
+rightUpperArm = character:FindFirstChild("RightUpperArm")
+if rightUpperArm then rightUpperArm.Transparency = 1 end
+rightLowerArm = character:FindFirstChild("RightLowerArm")
+if rightLowerArm then rightLowerArm.Transparency = 1 end
+rightFoot = character:FindFirstChild("RightFoot")
+if rightFoot then rightFoot.Transparency = 1 end
+
+leftUpperLeg = character:FindFirstChild("LeftUpperLeg")
+if leftUpperLeg then leftUpperLeg.Transparency = 1 end
+leftLowerLeg = character:FindFirstChild("LeftLowerLeg")
+if leftLowerLeg then leftLowerLeg.Transparency = 1 end
+leftFoot = character:FindFirstChild("LeftFoot")
+if leftFoot then leftFoot.Transparency = 1 end
+rightUpperLeg = character:FindFirstChild("RightUpperLeg")
+if rightUpperLeg then rightUpperLeg.Transparency = 1 end
+rightLowerLeg = character:FindFirstChild("RightLowerLeg")
+if rightLowerLeg then rightLowerLeg.Transparency = 1 end
+rightFoot = character:FindFirstChild("RightFoot")
+if rightFoot then rightFoot.Transparency = 1 end
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancel")
+                        end
+                    }
+                }
+            })
+        end
+    })
+    
+     local Toggle = Tabs.Esp:AddToggle("MyToggle", {Title = "noclip", Default = false })
+
+    Toggle:OnChanged(function(Value)
+          if Value then
+            noclip()
+        else
+            clip()
+        end
+    end)
+
+    Options.MyToggle:SetValue(false)
+    
+
+    local Colorpicker = Tabs.Main:AddColorpicker("Colorpicker", {
+        Title = "Colorpicker",
+        Default = Color3.fromRGB(96, 205, 255)
+    })
+
+    Colorpicker:OnChanged(function()
+        print("Colorpicker changed:", Colorpicker.Value)
+    end)
+    
+    Colorpicker:SetValueRGB(Color3.fromRGB(0, 255, 140))
+
+
+
+    local TColorpicker = Tabs.Main:AddColorpicker("TransparencyColorpicker", {
+        Title = "Colorpicker",
+        Description = "but you can change the transparency.",
+        Transparency = 0,
+        Default = Color3.fromRGB(96, 205, 255)
+    })
+
+    TColorpicker:OnChanged(function()
+        print(
+            "TColorpicker changed:", TColorpicker.Value,
+            "Transparency:", TColorpicker.Transparency
+        )
+    end)
+
+
+
+    local Keybind = Tabs.Main:AddKeybind("Keybind", {
+        Title = "KeyBind",
+        Mode = "Toggle", -- Always, Toggle, Hold
+        Default = "LeftControl", -- String as the name of the keybind (MB1, MB2 for mouse buttons)
+
+        -- Occurs when the keybind is clicked, Value is `true`/`false`
+        Callback = function(Value)
+            print("Keybind clicked!", Value)
+        end,
+
+        -- Occurs when the keybind itself is changed, `New` is a KeyCode Enum OR a UserInputType Enum
+        ChangedCallback = function(New)
+            print("Keybind changed!", New)
+        end
+    })
+
+    -- OnClick is only fired when you press the keybind and the mode is Toggle
+    -- Otherwise, you will have to use Keybind:GetState()
+    Keybind:OnClick(function()
+        print("Keybind clicked:", Keybind:GetState())
+    end)
+
+    Keybind:OnChanged(function()
+        print("Keybind changed:", Keybind.Value)
+    end)
+
+    task.spawn(function()
+        while true do
+            wait(1)
+
+            -- example for checking if a keybind is being pressed
+            local state = Keybind:GetState()
+            if state then
+                print("Keybind is being held down")
+            end
+
+            if Fluent.Unloaded then break end
+        end
+    end)
+
+    Keybind:SetValue("MB2", "Toggle") -- Sets keybind to MB2, mode to Hold
+
+
+    local Input = Tabs.Main:AddInput("Input", {
+        Title = "Input",
+        Default = "Default",
+        Placeholder = "Placeholder",
+        Numeric = false, -- Only allows numbers
+        Finished = false, -- Only calls callback when you press enter
+        Callback = function(Value)
+            print("Input changed:", Value)
+        end
+    })
+
+    Input:OnChanged(function()
+        print("Input updated:", Input.Value)
+    end)
+end
+
+
+-- Addons:
+-- SaveManager (Allows you to have a configuration system)
+-- InterfaceManager (Allows you to have a interface managment system)
+
+-- Hand the library over to our managers
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+
+-- Ignore keys that are used by ThemeManager.
+-- (we dont want configs to save themes, do we?)
+SaveManager:IgnoreThemeSettings()
+
+-- You can add indexes of elements the save manager should ignore
+SaveManager:SetIgnoreIndexes({})
+
+-- use case for doing it this way:
+-- a script hub could have themes in a global folder
+-- and game configs in a separate folder per game
+InterfaceManager:SetFolder("UrielHub")
+SaveManager:SetFolder("UrielHub/specific-game")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Uriel Hub",
+    Content = "The script has been loaded.",
+    Duration = 8
+})
+
+-- You can use the SaveManager:LoadAutoloadConfig() to load a config
+-- which has been marked to be one that auto loads!
+SaveManager:LoadAutoloadConfig()
